@@ -1,0 +1,32 @@
+[
+  {
+    "id": "example-openai",
+    "name": "GPT Example",
+    "type": "openai",
+    "endpoint": "https://example.com/v1/responses",
+    "model": "gpt-example",
+    "apiKey": "replace-me",
+    "checkMode": "challenge",
+    "simplePrompt": "hi",
+    "enabled": true,
+    "isMaintenance": false,
+    "requestHeaders": null,
+    "metadata": null,
+    "groupName": null
+  },
+  {
+    "id": "example-anthropic-simple",
+    "name": "Claude Simple Example",
+    "type": "anthropic",
+    "endpoint": "https://example.com/v1/messages",
+    "model": "claude-example",
+    "apiKey": "replace-me",
+    "checkMode": "simple",
+    "simplePrompt": "hi",
+    "enabled": false,
+    "isMaintenance": false,
+    "requestHeaders": null,
+    "metadata": null,
+    "groupName": null
+  }
+]

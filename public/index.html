@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>{{SITE_TITLE}}</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="{{SITE_BRAND}} 首页">{{SITE_BRAND}}</a>
+      <button class="header-button" id="refresh" type="button">刷新状态</button>
+    </header>
+
+    <div id="homeView">
+      <section class="overall-panel" id="heroStatus" aria-live="polite">
+        <div class="overall-heading">
+          <span class="status-icon" id="overallDot" aria-hidden="true">✓</span>
+          <h1 id="overallTitle">正在检查系统状态</h1>
+        </div>
+        <p id="overallMessage">正在获取最新真实检测结果...</p>
+      </section>
+
+      <section class="status-card" aria-labelledby="systemsTitle">
+        <div class="card-heading">
+          <h2 id="systemsTitle">系统状态</h2>
+          <span class="date-range"><span class="range-arrow">‹</span><span id="historyRange">-</span><span class="range-arrow">›</span></span>
+        </div>
+        <div id="components" class="component-list"></div>
+      </section>
+
+      <a class="history-button" href="/history">
+        <span class="calendar-icon" aria-hidden="true"></span>
+        查看事件记录
+      </a>
+    </div>
+
+    <section class="history-view" id="historyView" hidden aria-labelledby="historyTitle">
+      <nav class="breadcrumbs" aria-label="面包屑">
+        <a href="/">{{SITE_BRAND}}</a><span>/</span><a href="/history">事件记录</a>
+      </nav>
+      <div class="history-title-row">
+        <h1 id="historyTitle">事件记录</h1>
+        <span class="date-range"><span class="range-arrow">‹</span><span id="historyPageRange">-</span><span class="range-arrow">›</span></span>
+      </div>
+      <div id="incidents" class="incident-list"></div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="powered"><span>Powered by</span><strong>{{SITE_FOOTER_BRAND}}</strong></div>
+      <p>可用性指标基于真实模型请求汇总报告。不同模型、线路和上游服务的实际可用性可能有所差异。</p>
+    </footer>
+  </main>
+  <div class="hover-tooltip" id="hoverTooltip" role="tooltip" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

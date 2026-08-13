@@ -1,0 +1,31 @@
+services:
+  ai-status-monitor:
+    build: .
+    container_name: ai-status-monitor
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8099:3000"
+    environment:
+      PORT: "3000"
+      CONFIG_FILE: "/app/config/providers.json"
+      HISTORY_FILE: "/app/data/history.json"
+      CHECK_POLL_INTERVAL_SECONDS: "120"
+      CHECK_CONCURRENCY: "5"
+      CHECK_TIMEOUT_MS: "45000"
+      DEGRADED_THRESHOLD_MS: "10000"
+      HISTORY_RETENTION_DAYS: "30"
+      API_HISTORY_POINTS: "91"
+      SHOW_OVERALL_ALERT: "${SHOW_OVERALL_ALERT:-false}"
+      DEFAULT_GROUPS_EXPANDED: "${DEFAULT_GROUPS_EXPANDED:-true}"
+      SITE_TITLE: "${SITE_TITLE:-AI Status Monitor}"
+      SITE_BRAND: "${SITE_BRAND:-AI Status Monitor}"
+      SITE_FOOTER_BRAND: "${SITE_FOOTER_BRAND:-AI Status Monitor}"
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
