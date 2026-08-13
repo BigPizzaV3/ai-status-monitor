@@ -88,7 +88,7 @@ http://127.0.0.1:8099
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `CHECK_POLL_INTERVAL_SECONDS` | `120` | 检测间隔，单位为秒 |
+| `CHECK_POLL_INTERVAL_SECONDS` | `60` | 检测间隔，单位为秒 |
 | `CHECK_CONCURRENCY` | `5` | 同时检测的渠道数量 |
 | `CHECK_TIMEOUT_MS` | `45000` | 单次请求超时时间 |
 | `DEGRADED_THRESHOLD_MS` | `10000` | 超过该耗时标记为性能下降 |

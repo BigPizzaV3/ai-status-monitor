@@ -9,7 +9,7 @@ services:
       PORT: "3000"
       CONFIG_FILE: "/app/config/providers.json"
       HISTORY_FILE: "/app/data/history.json"
-      CHECK_POLL_INTERVAL_SECONDS: "120"
+      CHECK_POLL_INTERVAL_SECONDS: "60"
       CHECK_CONCURRENCY: "5"
       CHECK_TIMEOUT_MS: "45000"
       DEGRADED_THRESHOLD_MS: "10000"
