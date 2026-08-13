@@ -4,6 +4,12 @@
 
 项目会定时向配置的模型渠道发送真实请求，记录请求状态、响应耗时、端点网络延迟和历史记录，并提供一个可直接由 Nginx 代理的状态页面。
 
+## 页面预览
+
+> 以下界面使用模拟渠道和模拟状态数据，仅用于展示页面效果。
+
+![AI Status Monitor 页面预览](docs/assets/interface-preview.jpg)
+
 ## 功能
 
 - 支持 OpenAI、Anthropic 和 Gemini 协议渠道。
