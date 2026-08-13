@@ -82,6 +82,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/history" || url.pathname === "/history/")) {
     return serveIndex(response);
   }
+  if (request.method === "GET" && url.pathname === "/favicon.svg") return serveFile(response, "favicon.svg", "image/svg+xml");
   if (request.method === "GET" && url.pathname === "/app.css") return serveFile(response, "app.css", "text/css; charset=utf-8");
   if (request.method === "GET" && url.pathname === "/app.js") return serveFile(response, "app.js", "text/javascript; charset=utf-8");
   response.writeHead(404, { "content-type": "application/json" });
