@@ -108,7 +108,7 @@ function buildGroups(components) {
   ];
   const used = new Set();
   const groups = definitions.map((definition) => {
-    const children = components.filter((item) => definition.match(item));
+    const children = components.filter((item) => !used.has(item.id) && definition.match(item));
     children.forEach((item) => used.add(item.id));
     return makeGroup(definition.name, children);
   }).filter((group) => group.children.length);
