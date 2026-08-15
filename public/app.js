@@ -103,6 +103,7 @@ function setOverall(status, title, message) {
 function buildGroups(components) {
   const definitions = [
     { name: "Claude", match: (item) => /Claude|Anthropic/i.test(`${item.name} ${item.providerType}`) },
+    { name: "Grok", match: (item) => /Grok|xAI/i.test(`${item.name} ${item.model}`) },
     { name: "GPT", match: (item) => /GPT|OpenAI/i.test(`${item.name} ${item.providerType}`) }
   ];
   const used = new Set();
