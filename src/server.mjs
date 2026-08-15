@@ -37,6 +37,11 @@ const service = new CheckerService({
   apiHistoryPoints: numberEnv("API_HISTORY_POINTS", 91, 1, 1000)
 });
 
+function historyPage(url) {
+  const value = Number(url.searchParams.get("historyPage"));
+  return Number.isInteger(value) ? Math.min(10_000, Math.max(0, value)) : 0;
+}
+
 async function serveFile(response, fileName, contentType) {
   try {
     const body = await fs.readFile(path.join(publicDir, fileName));
@@ -68,12 +73,12 @@ const server = http.createServer(async (request, response) => {
   }
   if (request.method === "GET" && url.pathname === "/api/v1/status") {
     response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    return response.end(JSON.stringify(service.status()));
+    return response.end(JSON.stringify(service.status({ historyPage: historyPage(url) })));
   }
   if (request.method === "GET" && url.pathname === "/api/status") {
     response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return response.end(JSON.stringify({
-      ...transformStatus(service.status()),
+      ...transformStatus(service.status({ historyPage: historyPage(url) })),
       showOverallAlert,
       defaultGroupsExpanded,
       site

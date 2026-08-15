@@ -27,7 +27,11 @@
       <section class="status-card" aria-labelledby="systemsTitle">
         <div class="card-heading">
           <h2 id="systemsTitle">系统状态</h2>
-          <span class="date-range"><span class="range-arrow">‹</span><span id="historyRange">-</span><span class="range-arrow">›</span></span>
+          <span class="date-range">
+            <button class="range-arrow" type="button" data-history-direction="older" aria-label="查看更早记录" title="查看更早记录" disabled>‹</button>
+            <span id="historyRange">-</span>
+            <button class="range-arrow" type="button" data-history-direction="newer" aria-label="查看较新记录" title="查看较新记录" disabled>›</button>
+          </span>
         </div>
         <div id="components" class="component-list"></div>
       </section>
@@ -44,7 +48,11 @@
       </nav>
       <div class="history-title-row">
         <h1 id="historyTitle">事件记录</h1>
-        <span class="date-range"><span class="range-arrow">‹</span><span id="historyPageRange">-</span><span class="range-arrow">›</span></span>
+        <span class="date-range">
+          <button class="range-arrow" type="button" data-history-direction="older" aria-label="查看更早记录" title="查看更早记录" disabled>‹</button>
+          <span id="historyPageRange">-</span>
+          <button class="range-arrow" type="button" data-history-direction="newer" aria-label="查看较新记录" title="查看较新记录" disabled>›</button>
+        </span>
       </div>
       <div id="incidents" class="incident-list"></div>
     </section>

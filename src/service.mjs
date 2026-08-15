@@ -35,13 +35,20 @@ export class CheckerService {
     return this.running;
   }
 
-  status() {
+  status({ historyPage = 0 } = {}) {
+    const page = Number.isInteger(historyPage) && historyPage > 0 ? historyPage : 0;
+    const pageOffset = page * this.apiHistoryPoints;
+    let hasOlderHistory = false;
     const providers = this.providers.map((config) => {
       const all = this.store.points(config.id);
-      const items = all.slice(-this.apiHistoryPoints).reverse();
+      const pageEnd = Math.max(0, all.length - pageOffset);
+      const pageStart = Math.max(0, pageEnd - this.apiHistoryPoints);
+      const items = all.slice(pageStart, pageEnd).reverse();
+      const current = all.at(-1) || null;
+      hasOlderHistory ||= pageStart > 0;
       const latest = config.isMaintenance
-        ? { ...(items[0] || { checkedAt: new Date().toISOString(), latencyMs: null, pingLatencyMs: null, message: "维护中" }), status: "maintenance" }
-        : items[0] || null;
+        ? { ...(current || { checkedAt: new Date().toISOString(), latencyMs: null, pingLatencyMs: null, message: "维护中" }), status: "maintenance" }
+        : current;
       const counts = { operational: 0, degraded: 0, failed: 0, validation_failed: 0, error: 0 };
       const latencies = [];
       for (const item of all) {
@@ -83,7 +90,20 @@ export class CheckerService {
       if (Number.isFinite(provider.latest?.latencyMs)) latestLatencies.push(provider.latest.latencyMs);
     }
     summary.avgLatencyMs = latestLatencies.length ? Math.round(latestLatencies.reduce((sum, value) => sum + value, 0) / latestLatencies.length) : null;
-    return { providers, summary, metadata: { generatedAt: new Date().toISOString(), pollIntervalMs: this.intervalMs, pollIntervalLabel: formatInterval(this.intervalMs), lastCompletedAt: this.lastCompletedAt } };
+    return {
+      providers,
+      summary,
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        pollIntervalMs: this.intervalMs,
+        pollIntervalLabel: formatInterval(this.intervalMs),
+        lastCompletedAt: this.lastCompletedAt,
+        historyPage: page,
+        historyPageSize: this.apiHistoryPoints,
+        hasOlderHistory,
+        hasNewerHistory: page > 0
+      }
+    };
   }
 }
 

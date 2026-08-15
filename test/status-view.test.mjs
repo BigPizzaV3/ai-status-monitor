@@ -17,7 +17,14 @@ test("status view converts checker data for the bundled frontend", () => {
       ]
     }],
     summary: { total: 1, degraded: 1 },
-    metadata: { pollIntervalMs: 120_000, pollIntervalLabel: "2 分钟" }
+    metadata: {
+      pollIntervalMs: 120_000,
+      pollIntervalLabel: "2 分钟",
+      historyPage: 1,
+      historyPageSize: 91,
+      hasOlderHistory: true,
+      hasNewerHistory: true
+    }
   };
 
   const output = transformStatus(source);
@@ -26,4 +33,5 @@ test("status view converts checker data for the bundled frontend", () => {
   assert.equal(output.components[0].description, "gpt · OpenAI 协议");
   assert.equal(output.components[0].points[0].at, "2026-08-12T23:58:00.000Z");
   assert.equal(output.incidents[0].componentName, "One");
+  assert.deepEqual(output.history, { page: 1, pageSize: 91, hasOlder: true, hasNewer: true });
 });

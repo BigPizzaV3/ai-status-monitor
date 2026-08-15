@@ -41,7 +41,10 @@ button { font: inherit; }
 .card-heading { display: flex; align-items: center; gap: 22px; min-height: 53px; padding: 0 16px; border-bottom: .5px solid var(--soft-line); }
 .card-heading h2 { margin: 0; font-size: 18px; font-weight: 500; }
 .date-range { display: flex; align-items: center; gap: 8px; color: var(--light); font-size: 14px; }
-.range-arrow { color: #cacace; font-size: 24px; font-weight: 300; line-height: 1; }
+.range-arrow { display: inline-grid; place-items: center; width: 20px; height: 28px; padding: 0; border: 0; background: transparent; color: #95959d; cursor: pointer; font-size: 24px; font-weight: 300; line-height: 1; transition: color .15s ease; }
+.range-arrow:hover:not(:disabled) { color: #29292f; }
+.range-arrow:focus-visible { border-radius: 3px; outline: 2px solid #cacace; outline-offset: 1px; }
+.range-arrow:disabled { color: #dedee2; cursor: default; }
 .group-row { padding: 12px 16px; border-bottom: .5px solid var(--soft-line); }
 .group-row:last-child { border-bottom: 0; }
 .group-toggle { display: flex; align-items: center; width: 100%; min-height: 28px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; cursor: default; text-align: left; }

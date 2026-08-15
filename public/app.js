@@ -10,16 +10,25 @@ const hoverTooltip = document.querySelector("#hoverTooltip");
 const homeView = document.querySelector("#homeView");
 const historyView = document.querySelector("#historyView");
 const historyPageRange = document.querySelector("#historyPageRange");
+const historyNavigationButtons = [...document.querySelectorAll("[data-history-direction]")];
 const chartBarsCache = new WeakMap();
 let activeTooltipTarget = null;
 let activeHistoryBar = null;
+let activeHistoryPage = 0;
+let loading = false;
 
 const isHistoryPage = window.location.pathname === "/history" || window.location.pathname === "/history/";
 document.body.classList.toggle("history-page", isHistoryPage);
 homeView.hidden = isHistoryPage;
 historyView.hidden = !isHistoryPage;
 
-refreshButton.addEventListener("click", load);
+refreshButton.addEventListener("click", () => load(activeHistoryPage));
+historyNavigationButtons.forEach((button) => button.addEventListener("click", () => {
+  const targetPage = button.dataset.historyDirection === "older"
+    ? activeHistoryPage + 1
+    : Math.max(0, activeHistoryPage - 1);
+  load(targetPage);
+}));
 componentRoot.addEventListener("click", (event) => {
   const toggle = event.target.closest(".group-toggle");
   if (!toggle) return;
@@ -34,18 +43,23 @@ componentRoot.addEventListener("pointerleave", hideTooltip);
 componentRoot.addEventListener("focusin", showTooltip);
 componentRoot.addEventListener("focusout", hideTooltip);
 
-async function load() {
+async function load(historyPage = activeHistoryPage) {
+  if (loading) return;
+  loading = true;
   refreshButton.disabled = true;
   refreshButton.textContent = "刷新中...";
+  historyNavigationButtons.forEach((button) => { button.disabled = true; });
   try {
-    const response = await fetch("/api/status", { cache: "no-store" });
+    const response = await fetch(`/api/status?historyPage=${historyPage}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.message || "状态数据暂时不可用");
+    activeHistoryPage = data.history?.page ?? historyPage;
     render(data);
   } catch (error) {
     setOverall("outage", "状态数据暂时不可用", error.message);
     if (isHistoryPage) incidentsRoot.innerHTML = `<div class="history-empty">${escapeHtml(error.message)}</div>`;
   } finally {
+    loading = false;
     refreshButton.disabled = false;
     refreshButton.textContent = "刷新状态";
   }
@@ -67,6 +81,15 @@ function render(data) {
   historyPageRange.textContent = range;
   componentRoot.innerHTML = groups.map((group) => renderGroup(group, data.defaultGroupsExpanded === true)).join("");
   incidentsRoot.innerHTML = renderHistory(data);
+  updateHistoryNavigation(data.history);
+}
+
+function updateHistoryNavigation(history = {}) {
+  for (const button of historyNavigationButtons) {
+    button.disabled = button.dataset.historyDirection === "older"
+      ? history.hasOlder !== true
+      : history.hasNewer !== true;
+  }
 }
 
 function setOverall(status, title, message) {

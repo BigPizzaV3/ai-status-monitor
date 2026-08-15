@@ -44,6 +44,12 @@ export function transformStatus(source) {
     overall: hasFailure ? "outage" : hasDegraded ? "degraded" : "operational",
     pollIntervalMs: source.metadata?.pollIntervalMs || null,
     pollIntervalLabel: source.metadata?.pollIntervalLabel || "-",
+    history: {
+      page: source.metadata?.historyPage || 0,
+      pageSize: source.metadata?.historyPageSize || 0,
+      hasOlder: source.metadata?.hasOlderHistory === true,
+      hasNewer: source.metadata?.hasNewerHistory === true
+    },
     summary: source.summary || {},
     components,
     incidents: components
