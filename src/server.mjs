@@ -9,6 +9,7 @@ import { CheckerService } from "./service.mjs";
 import { transformStatus } from "./status-view.mjs";
 import { booleanEnv } from "./env.mjs";
 import { loadSiteConfig, renderSiteHtml } from "./site.mjs";
+import { createEmailNotifier } from "./email.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(root, "../public");
@@ -26,6 +27,19 @@ const intervalMs = numberEnv("CHECK_POLL_INTERVAL_SECONDS", 120, 15, 3600) * 100
 const providers = await loadConfig(process.env.CONFIG_FILE || "/app/config/providers.json");
 const store = new HistoryStore(process.env.HISTORY_FILE || "/app/data/history.json", numberEnv("HISTORY_RETENTION_DAYS", 30, 1, 365));
 await store.init();
+const smtpUsername = process.env.SMTP_USERNAME?.trim() || "";
+const emailNotifier = createEmailNotifier({
+  host: process.env.SMTP_HOST?.trim(),
+  port: numberEnv("SMTP_PORT", 465, 1, 65535),
+  username: smtpUsername,
+  password: process.env.SMTP_PASSWORD,
+  from: process.env.SMTP_FROM?.trim() || smtpUsername,
+  fromName: process.env.SMTP_FROM_NAME?.trim(),
+  useTls: booleanEnv("SMTP_USE_TLS", true),
+  recipients: process.env.ALERT_EMAIL_TO?.trim() || smtpUsername
+});
+if (emailNotifier.enabled) console.log("[ai-status-monitor] email alerts enabled");
+else if (emailNotifier.reason) console.warn(`[ai-status-monitor] ${emailNotifier.reason}`);
 const service = new CheckerService({
   providers,
   store,
@@ -34,7 +48,9 @@ const service = new CheckerService({
   concurrency: numberEnv("CHECK_CONCURRENCY", 5, 1, 20),
   timeoutMs: numberEnv("CHECK_TIMEOUT_MS", 45_000, 2_000, 120_000),
   degradedMs: numberEnv("DEGRADED_THRESHOLD_MS", 10_000, 1_000, 120_000),
-  apiHistoryPoints: numberEnv("API_HISTORY_POINTS", 91, 1, 1000)
+  apiHistoryPoints: numberEnv("API_HISTORY_POINTS", 91, 1, 1000),
+  alertNotifier: emailNotifier,
+  alertConsecutiveFailures: numberEnv("ALERT_CONSECUTIVE_FAILURES", 3, 1, 100)
 });
 
 function historyPage(url) {

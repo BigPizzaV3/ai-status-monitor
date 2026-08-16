@@ -17,6 +17,7 @@
 - 支持随机问答检测，避免仅返回固定内容的假响应。
 - 支持简单文本检测，例如只发送 `hi`。
 - 支持请求超时、重试和并发控制。
+- 支持渠道连续检测失败后的 SMTP 邮件告警和恢复通知。
 - 支持端点 `HEAD/GET` 网络延迟检测。
 - 支持本地 JSON 历史记录，默认保留 30 天。
 - 提供状态首页、事件记录页和 JSON API。
@@ -100,6 +101,36 @@ http://127.0.0.1:8099
 | `DEGRADED_THRESHOLD_MS` | `10000` | 超过该耗时标记为性能下降 |
 | `HISTORY_RETENTION_DAYS` | `30` | 历史记录保留天数 |
 | `API_HISTORY_POINTS` | `91` | API 返回的历史点数量 |
+
+### 邮件告警
+
+当渠道连续出现 `failed`、`validation_failed` 或 `error` 达到阈值时，服务发送一次故障邮件；渠道恢复到 `operational` 或 `degraded` 后发送一次恢复邮件。`degraded` 表示响应较慢，不会单独触发故障告警。
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ALERT_CONSECUTIVE_FAILURES` | `3` | 连续失败多少次后发送邮件 |
+| `ALERT_EMAIL_TO` | `SMTP_USERNAME` | 收件人，可用逗号、分号或空格分隔多个地址 |
+| `SMTP_HOST` | 空 | SMTP 服务器地址 |
+| `SMTP_PORT` | `465` | SMTP 端口 |
+| `SMTP_USERNAME` | 空 | SMTP 用户名 |
+| `SMTP_PASSWORD` | 空 | SMTP 密码，只从运行时环境变量读取 |
+| `SMTP_FROM` | `SMTP_USERNAME` | 发件地址 |
+| `SMTP_FROM_NAME` | 空 | 发件人显示名称 |
+| `SMTP_USE_TLS` | `true` | 是否启用 TLS；465 端口使用 SMTPS，其他端口使用 STARTTLS |
+
+例如，Sub2API 使用的 QQ SMTP 可以这样配置：
+
+```dotenv
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USERNAME=your-email@qq.com
+SMTP_PASSWORD=your-smtp-authorization-code
+SMTP_FROM=your-email@qq.com
+SMTP_USE_TLS=true
+ALERT_EMAIL_TO=your-email@qq.com
+```
+
+不要将真实 SMTP 密码提交到 Git 仓库或写入公开配置文件。
 
 ### 页面显示
 

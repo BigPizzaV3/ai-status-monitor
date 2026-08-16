@@ -6,6 +6,22 @@ function result(status, latencyMs = null) {
   return { id: "one", name: "One", type: "openai", endpoint: "https://example.com/v1/responses", model: "gpt", status, latencyMs, pingLatencyMs: 20, checkedAt: new Date().toISOString(), message: status };
 }
 
+function alertService(sequence, sent, threshold = 3) {
+  let index = 0;
+  const store = { points: () => [], append: async () => {} };
+  return new CheckerService({
+    providers: [{ id: "one", name: "One", type: "openai", endpoint: "https://example.com/v1/responses", model: "gpt", groupName: null }],
+    store,
+    checkAll: async () => [result(sequence[index++])],
+    intervalMs: 120_000,
+    concurrency: 1,
+    timeoutMs: 45_000,
+    degradedMs: 10_000,
+    alertConsecutiveFailures: threshold,
+    alertNotifier: { enabled: true, send: async (mail) => sent.push(mail) }
+  });
+}
+
 test("service avoids overlapping checks and exposes compatible status", async () => {
   const points = [];
   let release;
@@ -79,4 +95,36 @@ test("service paginates history without replacing the current provider status", 
   ]);
   assert.equal(oldestPage.metadata.hasOlderHistory, false);
   assert.equal(oldestPage.metadata.hasNewerHistory, true);
+});
+
+test("service sends one failure alert at the threshold and one recovery alert", async () => {
+  const sent = [];
+  const service = alertService(["error", "failed", "validation_failed", "degraded", "error", "error", "error"], sent);
+
+  await service.run();
+  await service.run();
+  assert.equal(sent.length, 0);
+  await service.run();
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].subject, /连续检测失败/);
+  assert.match(sent[0].text, /连续失败次数: 3/);
+
+  await service.run();
+  assert.equal(sent.length, 2);
+  assert.match(sent[1].subject, /已恢复/);
+
+  await service.run();
+  await service.run();
+  await service.run();
+  assert.equal(sent.length, 3);
+  assert.match(sent[2].subject, /连续检测失败/);
+});
+
+test("degraded results do not count as failures", async () => {
+  const sent = [];
+  const service = alertService(["degraded", "degraded", "degraded"], sent);
+  await service.run();
+  await service.run();
+  await service.run();
+  assert.equal(sent.length, 0);
 });
