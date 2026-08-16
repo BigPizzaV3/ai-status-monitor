@@ -10,6 +10,8 @@ import { transformStatus } from "./status-view.mjs";
 import { booleanEnv } from "./env.mjs";
 import { loadSiteConfig, renderSiteHtml } from "./site.mjs";
 import { createEmailNotifier } from "./email.mjs";
+import { createTelegramNotifier } from "./telegram.mjs";
+import { createNotifierGroup } from "./notifier.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(root, "../public");
@@ -40,6 +42,17 @@ const emailNotifier = createEmailNotifier({
 });
 if (emailNotifier.enabled) console.log("[ai-status-monitor] email alerts enabled");
 else if (emailNotifier.reason) console.warn(`[ai-status-monitor] ${emailNotifier.reason}`);
+const telegramNotifier = createTelegramNotifier({
+  botToken: process.env.TELEGRAM_BOT_TOKEN,
+  chatId: process.env.TELEGRAM_CHAT_ID,
+  messageThreadId: process.env.TELEGRAM_MESSAGE_THREAD_ID
+});
+if (telegramNotifier.enabled) console.log("[ai-status-monitor] Telegram alerts enabled");
+else if (telegramNotifier.reason) console.warn(`[ai-status-monitor] ${telegramNotifier.reason}`);
+const alertNotifier = createNotifierGroup([
+  { name: "email", notifier: emailNotifier },
+  { name: "Telegram", notifier: telegramNotifier }
+]);
 const service = new CheckerService({
   providers,
   store,
@@ -49,7 +62,7 @@ const service = new CheckerService({
   timeoutMs: numberEnv("CHECK_TIMEOUT_MS", 45_000, 2_000, 120_000),
   degradedMs: numberEnv("DEGRADED_THRESHOLD_MS", 10_000, 1_000, 120_000),
   apiHistoryPoints: numberEnv("API_HISTORY_POINTS", 91, 1, 1000),
-  alertNotifier: emailNotifier,
+  alertNotifier,
   alertConsecutiveFailures: numberEnv("ALERT_CONSECUTIVE_FAILURES", 3, 1, 100)
 });
 
