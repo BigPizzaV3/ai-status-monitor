@@ -142,18 +142,6 @@ Telegram Bot -> /status、/history -> 读取已有状态和历史
 | `TELEGRAM_STATUS_URL` | 空 | 命令回复中附带的完整状态页地址 |
 | `TELEGRAM_SCREENSHOT_URL` | `http://127.0.0.1:3000` | `/screenshot` 在容器内打开的状态页地址 |
 
-例如，Sub2API 使用的 QQ SMTP 可以这样配置：
-
-```dotenv
-SMTP_HOST=smtp.qq.com
-SMTP_PORT=465
-SMTP_USERNAME=your-email@qq.com
-SMTP_PASSWORD=your-smtp-authorization-code
-SMTP_FROM=your-email@qq.com
-SMTP_USE_TLS=true
-ALERT_EMAIL_TO=your-email@qq.com
-```
-
 不要将真实 SMTP 密码提交到 Git 仓库或写入公开配置文件。
 
 Telegram 示例：
