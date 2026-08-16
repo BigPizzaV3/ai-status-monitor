@@ -13,6 +13,7 @@ import { createEmailNotifier } from "./email.mjs";
 import { createTelegramNotifier } from "./telegram.mjs";
 import { createNotifierGroup } from "./notifier.mjs";
 import { TelegramCommandService } from "./telegram-commands.mjs";
+import { capturePageScreenshot } from "./screenshot.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(root, "../public");
@@ -71,7 +72,9 @@ const telegramCommands = booleanEnv("TELEGRAM_COMMANDS_ENABLED", true) ? new Tel
   checkerService: service,
   allowedChatId: process.env.TELEGRAM_CHAT_ID,
   defaultHistoryHours: numberEnv("TELEGRAM_HISTORY_DEFAULT_HOURS", 24, 1, 720),
-  statusUrl: process.env.TELEGRAM_STATUS_URL
+  statusUrl: process.env.TELEGRAM_STATUS_URL,
+  screenshotUrl: process.env.TELEGRAM_SCREENSHOT_URL || `http://127.0.0.1:${port}`,
+  captureScreenshot: capturePageScreenshot
 }) : null;
 
 function historyPage(url) {

@@ -123,6 +123,7 @@ http://127.0.0.1:8099
 | `TELEGRAM_COMMANDS_ENABLED` | `true` | 是否启用机器人查询命令 |
 | `TELEGRAM_HISTORY_DEFAULT_HOURS` | `24` | `/history` 默认统计小时数 |
 | `TELEGRAM_STATUS_URL` | 空 | 命令回复中附带的完整状态页地址 |
+| `TELEGRAM_SCREENSHOT_URL` | `http://127.0.0.1:3000` | `/screenshot` 在容器内打开的状态页地址 |
 
 例如，Sub2API 使用的 QQ SMTP 可以这样配置：
 
@@ -154,6 +155,7 @@ TELEGRAM_CHAT_ID=-1001234567890
 - `/history`：显示最近 24 小时可用率、失败次数、延迟和趋势。
 - `/history 1h`：显示最近 1 小时历史。
 - `/history 7d`：显示最近 7 天历史，最长支持 30 天。
+- `/screenshot`：在容器内渲染状态页并发送整页 PNG 截图。
 
 ### 页面显示
 

@@ -9,12 +9,14 @@ const STATUS_LABELS = {
 };
 
 export class TelegramCommandService {
-  constructor({ telegram, checkerService, allowedChatId, defaultHistoryHours = 24, statusUrl = "" }) {
+  constructor({ telegram, checkerService, allowedChatId, defaultHistoryHours = 24, statusUrl = "", screenshotUrl = "", captureScreenshot = null }) {
     this.telegram = telegram;
     this.checkerService = checkerService;
     this.allowedChatId = String(allowedChatId || "");
     this.defaultHistoryHours = defaultHistoryHours;
     this.statusUrl = String(statusUrl || "").trim();
+    this.screenshotUrl = String(screenshotUrl || "").trim();
+    this.captureScreenshot = captureScreenshot;
     this.offset = null;
     this.stopped = true;
     this.loopPromise = null;
@@ -37,6 +39,7 @@ export class TelegramCommandService {
       await this.telegram.setCommands([
         { command: "status", description: "查看当前渠道状态" },
         { command: "history", description: "查看最近 24 小时历史" },
+        { command: "screenshot", description: "获取状态页截图" },
         { command: "help", description: "查看机器人命令" }
       ]);
       const latest = await this.telegram.getUpdates({ offset: -1, limit: 1, timeout: 0 });
@@ -82,6 +85,22 @@ export class TelegramCommandService {
       await this.telegram.sendText(formatCurrentStatus(this.checkerService.status(), this.statusUrl), replyTarget);
       return true;
     }
+    if (command === "/screenshot") {
+      if (!this.screenshotUrl || typeof this.captureScreenshot !== "function") {
+        await this.telegram.sendText("页面截图功能尚未配置。", replyTarget);
+        return true;
+      }
+      await this.telegram.sendText("正在生成状态页截图...", replyTarget);
+      try {
+        const image = await this.captureScreenshot({ url: this.screenshotUrl });
+        const caption = this.statusUrl ? `状态页截图\n${this.statusUrl}` : "状态页截图";
+        await this.telegram.sendPhoto(image, { ...replyTarget, caption });
+      } catch (error) {
+        console.error(`[ai-status-monitor] screenshot command failed: ${error.message}`);
+        await this.telegram.sendText("状态页截图生成失败，请稍后重试。", replyTarget);
+      }
+      return true;
+    }
     if (command === "/help" || command === "/start") {
       await this.telegram.sendText([
         "状态监控命令",
@@ -89,7 +108,8 @@ export class TelegramCommandService {
         "/status - 查看当前渠道状态",
         "/history - 查看最近 24 小时历史",
         "/history 1h - 查看最近 1 小时",
-        "/history 7d - 查看最近 7 天"
+        "/history 7d - 查看最近 7 天",
+        "/screenshot - 获取状态页截图"
       ].join("\n"), replyTarget);
       return true;
     }

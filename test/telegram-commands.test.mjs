@@ -52,3 +52,29 @@ test("history command only responds in the configured chat", async () => {
   assert.equal(await commands.handleUpdate({ message: { text: "/history", chat: { id: -2002 } } }), false);
   assert.equal(sent.length, 1);
 });
+
+test("screenshot command captures and uploads the configured page", async () => {
+  const sent = [];
+  const image = new Uint8Array([1, 2, 3]);
+  let capturedUrl;
+  const telegram = {
+    enabled: true,
+    sendText: async (text) => sent.push(["text", text]),
+    sendPhoto: async (value, options) => sent.push(["photo", value, options])
+  };
+  const commands = new TelegramCommandService({
+    telegram,
+    checkerService: { historySummary: () => history, status: () => ({ providers: [], metadata: {} }) },
+    allowedChatId: "-1001",
+    statusUrl: "https://status.example.com",
+    screenshotUrl: "http://127.0.0.1:3000",
+    captureScreenshot: async ({ url }) => { capturedUrl = url; return image; }
+  });
+
+  assert.equal(await commands.handleUpdate({ message: { text: "/screenshot", chat: { id: -1001 } } }), true);
+  assert.equal(capturedUrl, "http://127.0.0.1:3000");
+  assert.equal(sent[0][0], "text");
+  assert.equal(sent[1][0], "photo");
+  assert.deepEqual(sent[1][1], image);
+  assert.match(sent[1][2].caption, /status\.example\.com/);
+});

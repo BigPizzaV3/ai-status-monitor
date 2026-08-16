@@ -30,6 +30,15 @@ export function createTelegramNotifier({ botToken, chatId, messageThreadId, fetc
       await request("sendMessage", payload);
       return true;
     },
+    async sendPhoto(image, { caption = "", chatId: destination = target, messageThreadId: destinationThread = numericThread } = {}) {
+      const form = new FormData();
+      form.append("chat_id", String(destination));
+      if (caption) form.append("caption", String(caption).slice(0, 1024));
+      if (destinationThread) form.append("message_thread_id", String(destinationThread));
+      form.append("photo", new Blob([image], { type: "image/png" }), "status.png");
+      await requestForm("sendPhoto", form, 45_000);
+      return true;
+    },
     async getUpdates({ offset, limit = 50, timeout = 25 } = {}) {
       const payload = { limit, timeout, allowed_updates: ["message"] };
       if (Number.isInteger(offset)) payload.offset = offset;
@@ -54,6 +63,24 @@ export function createTelegramNotifier({ botToken, chatId, messageThreadId, fetc
       throw new Error("Telegram API request failed");
     }
 
+    return parseResponse(response);
+  }
+
+  async function requestForm(method, form, timeoutMs) {
+    let response;
+    try {
+      response = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch {
+      throw new Error("Telegram API request failed");
+    }
+    return parseResponse(response);
+  }
+
+  async function parseResponse(response) {
     let result = null;
     try {
       result = await response.json();

@@ -67,3 +67,24 @@ test("Telegram notifier polls updates and registers commands", async () => {
   assert.match(requests[1].url, /getUpdates$/);
   assert.equal(requests[1].body.offset, 10);
 });
+
+test("Telegram notifier uploads PNG screenshots", async () => {
+  let url;
+  let form;
+  const notifier = createTelegramNotifier({
+    botToken: "123456:token-value",
+    chatId: "-1001",
+    fetchImpl: async (target, options) => {
+      url = target;
+      form = options.body;
+      return { ok: true, status: 200, json: async () => ({ ok: true, result: {} }) };
+    }
+  });
+
+  await notifier.sendPhoto(new Uint8Array([1, 2, 3]), { caption: "Status", messageThreadId: 42 });
+  assert.match(url, /sendPhoto$/);
+  assert.equal(form.get("chat_id"), "-1001");
+  assert.equal(form.get("caption"), "Status");
+  assert.equal(form.get("message_thread_id"), "42");
+  assert.equal(form.get("photo").size, 3);
+});
