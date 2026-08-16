@@ -48,3 +48,22 @@ test("Telegram notifier reports API errors without including the bot token", asy
     return true;
   });
 });
+
+test("Telegram notifier polls updates and registers commands", async () => {
+  const requests = [];
+  const notifier = createTelegramNotifier({
+    botToken: "123456:token-value",
+    chatId: "123",
+    fetchImpl: async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      return { ok: true, status: 200, json: async () => ({ ok: true, result: [] }) };
+    }
+  });
+
+  await notifier.setCommands([{ command: "history", description: "History" }]);
+  assert.deepEqual(await notifier.getUpdates({ offset: 10, limit: 5, timeout: 0 }), []);
+  assert.match(requests[0].url, /setMyCommands$/);
+  assert.deepEqual(requests[0].body.commands, [{ command: "history", description: "History" }]);
+  assert.match(requests[1].url, /getUpdates$/);
+  assert.equal(requests[1].body.offset, 10);
+});

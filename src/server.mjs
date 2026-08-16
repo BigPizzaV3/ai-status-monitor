@@ -12,6 +12,7 @@ import { loadSiteConfig, renderSiteHtml } from "./site.mjs";
 import { createEmailNotifier } from "./email.mjs";
 import { createTelegramNotifier } from "./telegram.mjs";
 import { createNotifierGroup } from "./notifier.mjs";
+import { TelegramCommandService } from "./telegram-commands.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(root, "../public");
@@ -65,6 +66,13 @@ const service = new CheckerService({
   alertNotifier,
   alertConsecutiveFailures: numberEnv("ALERT_CONSECUTIVE_FAILURES", 3, 1, 100)
 });
+const telegramCommands = booleanEnv("TELEGRAM_COMMANDS_ENABLED", true) ? new TelegramCommandService({
+  telegram: telegramNotifier,
+  checkerService: service,
+  allowedChatId: process.env.TELEGRAM_CHAT_ID,
+  defaultHistoryHours: numberEnv("TELEGRAM_HISTORY_DEFAULT_HOURS", 24, 1, 720),
+  statusUrl: process.env.TELEGRAM_STATUS_URL
+}) : null;
 
 function historyPage(url) {
   const value = Number(url.searchParams.get("historyPage"));
@@ -126,11 +134,13 @@ const server = http.createServer(async (request, response) => {
 server.listen(port, "0.0.0.0", () => {
   console.log(`[ai-status-monitor] listening on :${port}; providers=${providers.length}; interval=${intervalMs}ms`);
   service.start();
+  telegramCommands?.start();
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     service.stop();
+    telegramCommands?.stop();
     server.close(() => process.exit(0));
   });
 }

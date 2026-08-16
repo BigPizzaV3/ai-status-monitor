@@ -78,6 +78,30 @@ export class CheckerService {
     }
   }
 
+  historySummary({ hours = 24, trendPoints = 16 } = {}) {
+    const safeHours = Math.min(30 * 24, Math.max(1, Number(hours) || 24));
+    const to = this.now();
+    const from = new Date(to.getTime() - safeHours * 3_600_000);
+    const providers = this.providers.map((config) => {
+      const points = this.store.points(config.id).filter((point) => Date.parse(point.checkedAt) >= from.getTime());
+      const successful = points.filter((point) => HEALTHY_STATUSES.has(point.status));
+      const failedChecks = points.filter((point) => FAILURE_STATUSES.has(point.status)).length;
+      const latencies = points.map((point) => point.latencyMs).filter(Number.isFinite);
+      return {
+        id: config.id,
+        name: config.name,
+        model: config.model,
+        totalChecks: points.length,
+        failedChecks,
+        successRate: points.length ? Math.round(successful.length / points.length * 10_000) / 100 : 0,
+        avgLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : null,
+        maxLatencyMs: latencies.length ? Math.max(...latencies) : null,
+        trend: points.slice(-trendPoints).map((point) => point.status)
+      };
+    });
+    return { hours: safeHours, from: from.toISOString(), to: to.toISOString(), providers };
+  }
+
   status({ historyPage = 0 } = {}) {
     const page = Number.isInteger(historyPage) && historyPage > 0 ? historyPage : 0;
     const pageOffset = page * this.apiHistoryPoints;

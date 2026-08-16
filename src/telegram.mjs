@@ -18,38 +18,54 @@ export function createTelegramNotifier({ botToken, chatId, messageThreadId, fetc
   return {
     enabled: true,
     async send({ subject, text }) {
+      return this.sendText(`${subject}\n\n${text}`);
+    },
+    async sendText(text, { chatId: destination = target, messageThreadId: destinationThread = numericThread } = {}) {
       const payload = {
-        chat_id: target,
-        text: `${subject}\n\n${text}`.slice(0, 4096),
+        chat_id: String(destination),
+        text: String(text).slice(0, 4096),
         disable_web_page_preview: true
       };
-      if (numericThread) payload.message_thread_id = numericThread;
-
-      let response;
-      try {
-        response = await fetchImpl(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(15_000)
-        });
-      } catch {
-        throw new Error("Telegram API request failed");
-      }
-
-      let result = null;
-      try {
-        result = await response.json();
-      } catch {
-        // The HTTP status still provides a useful error when Telegram returns a non-JSON body.
-      }
-      if (!response.ok || result?.ok === false) {
-        const description = typeof result?.description === "string" ? `: ${result.description.slice(0, 200)}` : "";
-        throw new Error(`Telegram API error (${response.status})${description}`);
-      }
+      if (destinationThread) payload.message_thread_id = Number(destinationThread);
+      await request("sendMessage", payload);
+      return true;
+    },
+    async getUpdates({ offset, limit = 50, timeout = 25 } = {}) {
+      const payload = { limit, timeout, allowed_updates: ["message"] };
+      if (Number.isInteger(offset)) payload.offset = offset;
+      return request("getUpdates", payload, (timeout + 10) * 1000);
+    },
+    async setCommands(commands) {
+      await request("setMyCommands", { commands });
       return true;
     }
   };
+
+  async function request(method, payload, timeoutMs = 15_000) {
+    let response;
+    try {
+      response = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch {
+      throw new Error("Telegram API request failed");
+    }
+
+    let result = null;
+    try {
+      result = await response.json();
+    } catch {
+      // The HTTP status still provides a useful error when Telegram returns a non-JSON body.
+    }
+    if (!response.ok || result?.ok === false) {
+      const description = typeof result?.description === "string" ? `: ${result.description.slice(0, 200)}` : "";
+      throw new Error(`Telegram API error (${response.status})${description}`);
+    }
+    return result?.result;
+  }
 }
 
 function disabled(reason) {

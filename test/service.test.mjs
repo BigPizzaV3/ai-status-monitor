@@ -128,3 +128,30 @@ test("degraded results do not count as failures", async () => {
   await service.run();
   assert.equal(sent.length, 0);
 });
+
+test("service summarizes a requested history window", () => {
+  const points = [
+    { ...result("failed", 500), checkedAt: "2026-08-15T23:00:00.000Z" },
+    { ...result("operational", 1000), checkedAt: "2026-08-16T01:00:00.000Z" },
+    { ...result("degraded", 11_000), checkedAt: "2026-08-16T02:00:00.000Z" },
+    { ...result("error", null), checkedAt: "2026-08-16T03:00:00.000Z" }
+  ];
+  const service = new CheckerService({
+    providers: [{ id: "one", name: "One", type: "openai", endpoint: "https://example.com/v1/responses", model: "gpt", groupName: null }],
+    store: { points: () => points, append: async () => {} },
+    checkAll: async () => [],
+    intervalMs: 60_000,
+    concurrency: 1,
+    timeoutMs: 45_000,
+    degradedMs: 10_000,
+    now: () => new Date("2026-08-16T04:00:00.000Z")
+  });
+
+  const summary = service.historySummary({ hours: 3, trendPoints: 2 });
+  assert.equal(summary.providers[0].totalChecks, 3);
+  assert.equal(summary.providers[0].failedChecks, 1);
+  assert.equal(summary.providers[0].successRate, 66.67);
+  assert.equal(summary.providers[0].avgLatencyMs, 6000);
+  assert.equal(summary.providers[0].maxLatencyMs, 11_000);
+  assert.deepEqual(summary.providers[0].trend, ["degraded", "error"]);
+});
