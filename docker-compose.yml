@@ -2,6 +2,7 @@ services:
   ai-status-monitor:
     build: .
     container_name: ai-status-monitor
+    init: true
     restart: unless-stopped
     ports:
       - "127.0.0.1:8099:3000"
@@ -9,12 +10,12 @@ services:
       PORT: "3000"
       CONFIG_FILE: "/app/config/providers.json"
       HISTORY_FILE: "/app/data/history.json"
-      CHECK_POLL_INTERVAL_SECONDS: "60"
-      CHECK_CONCURRENCY: "5"
-      CHECK_TIMEOUT_MS: "45000"
-      DEGRADED_THRESHOLD_MS: "10000"
-      HISTORY_RETENTION_DAYS: "30"
-      API_HISTORY_POINTS: "91"
+      CHECK_POLL_INTERVAL_SECONDS: "${CHECK_POLL_INTERVAL_SECONDS:-60}"
+      CHECK_CONCURRENCY: "${CHECK_CONCURRENCY:-5}"
+      CHECK_TIMEOUT_MS: "${CHECK_TIMEOUT_MS:-45000}"
+      DEGRADED_THRESHOLD_MS: "${DEGRADED_THRESHOLD_MS:-10000}"
+      HISTORY_RETENTION_DAYS: "${HISTORY_RETENTION_DAYS:-30}"
+      API_HISTORY_POINTS: "${API_HISTORY_POINTS:-91}"
       ALERT_CONSECUTIVE_FAILURES: "${ALERT_CONSECUTIVE_FAILURES:-3}"
       ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-}"
       SMTP_HOST: "${SMTP_HOST:-}"

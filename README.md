@@ -1,6 +1,6 @@
 # AI Status Monitor
 
-一个轻量、可自托管的 AI 模型接口状态监控服务。
+一个可自托管的 AI 模型接口状态监控服务。
 
 项目会定时向配置的模型渠道发送真实请求，记录请求状态、响应耗时、端点网络延迟和历史记录，并提供一个可直接由 Nginx 代理的状态页面。
 
@@ -18,6 +18,8 @@
 - 支持简单文本检测，例如只发送 `hi`。
 - 支持请求超时、重试和并发控制。
 - 支持渠道连续检测失败后的邮件、Telegram 告警和恢复通知。
+- 支持 Telegram Bot 主动查询当前状态和指定时间范围的历史统计。
+- 支持在容器内用 Chromium 生成状态页整页截图并发送到 Telegram。
 - 支持端点 `HEAD/GET` 网络延迟检测。
 - 支持本地 JSON 历史记录，默认保留 30 天。
 - 提供状态首页、事件记录页和 JSON API。
@@ -47,6 +49,21 @@ http://127.0.0.1:8099
 ```
 
 推荐通过 Nginx 或其他反向代理对外提供访问，不建议直接暴露检测服务端口。
+
+## 工作方式
+
+```text
+定时任务 -> 真实模型请求 -> JSON 历史记录 -> 状态页 / JSON API
+                         \-> 连续失败计数 -> SMTP / Telegram 告警
+
+Telegram Bot -> /status、/history -> 读取已有状态和历史
+             \-> /screenshot -> 容器内 Chromium -> PNG -> Telegram
+```
+
+- 定时检测、Bot 查询和页面 API 使用同一份本地历史数据。
+- `/status` 和 `/history` 不会额外请求模型。
+- `/screenshot` 访问容器自身的状态页，不依赖第三方截图平台。
+- Chromium 只在生成截图时启动，截图保存在内存中，发送后即释放。
 
 ## 渠道配置
 
@@ -108,7 +125,7 @@ http://127.0.0.1:8099
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `ALERT_CONSECUTIVE_FAILURES` | `3` | 连续失败多少次后发送邮件 |
+| `ALERT_CONSECUTIVE_FAILURES` | `3` | 连续失败多少次后发送告警通知 |
 | `ALERT_EMAIL_TO` | `SMTP_USERNAME` | 收件人，可用逗号、分号或空格分隔多个地址 |
 | `SMTP_HOST` | 空 | SMTP 服务器地址 |
 | `SMTP_PORT` | `465` | SMTP 端口 |
@@ -157,6 +174,12 @@ TELEGRAM_CHAT_ID=-1001234567890
 - `/history 7d`：显示最近 7 天历史，最长支持 30 天。
 - `/screenshot`：在容器内渲染状态页并发送整页 PNG 截图。
 
+### 页面截图
+
+截图能力已经集成在项目镜像中，由 `puppeteer-core` 驱动容器内的 Chromium，并安装 Noto CJK 字体保证中文正常显示。截图时会等待页面数据和字体加载完成，自动展开模型分组，再以 PNG 图片上传到 Telegram。
+
+启用截图后的镜像通常约为 `500 MB`，具体取决于基础镜像和软件包版本。Chromium 不会常驻运行；空闲时仍只有 Node.js 服务，生成截图时会短暂增加 CPU 和内存使用。Compose 使用 `init: true` 回收 Chromium 退出后的子进程。
+
 ### 页面显示
 
 | 变量 | 默认值 | 说明 |
@@ -196,6 +219,32 @@ DEFAULT_GROUPS_EXPANDED=true
 - Docker Compose 已将配置目录只读挂载到容器。
 - 建议将 `.env`、`config/providers.json` 和 `data/` 保持在 Git 忽略范围内。
 - 项目日志不会输出 API key 或完整请求内容。
+- Telegram Bot 只处理配置的 `TELEGRAM_CHAT_ID`，其他会话中的命令会被忽略。
+- SMTP 密码和 Telegram Bot Token 只能存放在未提交的 `.env` 中。
+
+## 常见问题
+
+### Telegram 命令没有响应
+
+确认机器人已经加入目标群组并具有发送消息权限，`TELEGRAM_CHAT_ID` 与目标会话一致，且没有为同一个 Bot 配置其他 `getUpdates` 消费者或 Webhook。
+
+### 截图生成失败
+
+先检查容器日志：
+
+```bash
+docker compose logs --tail=100 ai-status-monitor
+```
+
+默认截图地址为容器自身的 `http://127.0.0.1:3000`。如果修改了端口或页面路径，需要同步调整 `TELEGRAM_SCREENSHOT_URL`。
+
+### 修改配置后没有生效
+
+环境变量由 Docker Compose 在创建容器时注入，修改 `.env` 后需要重建容器：
+
+```bash
+docker compose up -d
+```
 
 ## 开发和测试
 
