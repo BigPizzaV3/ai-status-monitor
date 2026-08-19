@@ -132,16 +132,19 @@ function makeGroup(name, children) {
 function aggregatePoints(components) {
   const maxLength = Math.max(0, ...components.map((item) => item.points.length));
   return Array.from({ length: maxLength }, (_, index) => {
-    const statuses = [];
-    let newest = null;
+    const points = [];
     for (const component of components) {
       const offset = maxLength - component.points.length;
       const point = component.points[index - offset];
       if (!point) continue;
-      statuses.push(point.status);
-      if (!newest || new Date(point.at) > new Date(newest.at)) newest = point;
+      points.push(point);
     }
-    return newest ? { ...newest, status: worstStatus(statuses) } : null;
+    if (!points.length) return null;
+    const status = worstStatus(points.map((point) => point.status));
+    const representative = points
+      .filter((point) => point.status === status)
+      .sort((left, right) => new Date(right.at) - new Date(left.at))[0] || points[0];
+    return { ...representative, status };
   }).filter(Boolean);
 }
 
@@ -181,8 +184,8 @@ function renderBars(points) {
     ? Array.from({ length: count }, (_, index) => points[Math.floor(index * points.length / count)])
     : [...Array(Math.max(0, count - points.length)).fill(null), ...points];
   return `<div class="history-bars" aria-label="最近真实请求记录">${sampled.map((point) => point
-    ? `<span class="history-bar ${barClass(point.status)}" tabindex="0" data-date="${escapeHtml(formatDate(point.at))}" data-status="${escapeHtml(statusLabel(point.status))}" data-kind="${statusClass(point.status)}" data-latency="${escapeHtml(formatLatency(point.latencyMs))}"></span>`
-    : `<span class="history-bar empty" tabindex="0" data-date="暂无数据" data-status="无检测记录" data-kind="unknown" data-latency="延迟未知"></span>`).join("")}</div>`;
+    ? `<span class="history-bar ${barClass(point.status)}" tabindex="0" data-date="${escapeHtml(formatDate(point.at))}" data-status="${escapeHtml(statusLabel(point.status))}" data-kind="${statusClass(point.status)}" data-latency="${escapeHtml(formatLatency(point.latencyMs))}" data-message="${escapeHtml(errorTooltipMessage(point))}"></span>`
+    : `<span class="history-bar empty" tabindex="0" data-date="暂无数据" data-status="无检测记录" data-kind="unknown" data-latency="延迟未知" data-message=""></span>`).join("")}</div>`;
 }
 
 function renderHistory(data) {
@@ -251,8 +254,11 @@ function showTooltipFor(target, event, chartRect = null) {
   const isBar = target.classList.contains("history-bar");
   const targetChanged = activeTooltipTarget !== target;
   const tooltipClass = isBar ? "hover-tooltip chart-tooltip visible" : "hover-tooltip info-tooltip visible";
+  const errorMessage = isBar && target.dataset.message
+    ? `<div class="tooltip-error"><span>错误信息</span><p>${escapeHtml(target.dataset.message)}</p></div>`
+    : "";
   const tooltipContent = isBar
-    ? `<div class="tooltip-date">${escapeHtml(target.dataset.date)}</div><div class="tooltip-result"><span class="status-icon ${escapeHtml(target.dataset.kind)}">${statusGlyph(target.dataset.kind)}</span><strong>${escapeHtml(target.dataset.status)}</strong><span class="tooltip-latency">${escapeHtml(target.dataset.latency)}</span></div>`
+    ? `<div class="tooltip-date">${escapeHtml(target.dataset.date)}</div><div class="tooltip-result"><span class="status-icon ${escapeHtml(target.dataset.kind)}">${statusGlyph(target.dataset.kind)}</span><strong>${escapeHtml(target.dataset.status)}</strong><span class="tooltip-latency">${escapeHtml(target.dataset.latency)}</span></div>${errorMessage}`
     : escapeHtml(target.dataset.tooltip);
 
   if (targetChanged) {
@@ -297,8 +303,12 @@ function positionTooltipByElement(target) {
 function positionChartTooltip(clientX, chartRect) {
   const margin = 10;
   const width = hoverTooltip.offsetWidth;
+  const height = hoverTooltip.offsetHeight;
   const left = Math.min(window.innerWidth - width - margin, Math.max(margin, clientX - width / 2));
-  const top = chartRect.bottom + 4;
+  const below = chartRect.bottom + 4;
+  const top = below + height <= window.innerHeight - margin
+    ? below
+    : Math.max(margin, chartRect.top - height - 4);
   hoverTooltip.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
 }
 
@@ -318,6 +328,9 @@ function statusLabel(status) { return { operational: "正常运行", degraded: "
 function statusClass(status) { if (["failed", "validation_failed", "error", "outage"].includes(status)) return "outage"; if (["degraded", "maintenance"].includes(status)) return "degraded"; if (status === "unknown") return "unknown"; return "operational"; }
 function statusGlyph(status) { const kind = statusClass(status); return kind === "outage" ? "×" : kind === "degraded" ? "!" : kind === "unknown" ? "?" : "✓"; }
 function barClass(status) { return statusClass(status); }
+function errorTooltipMessage(point) {
+  return statusClass(point.status) === "outage" ? String(point.message || "检测失败，未返回详细错误信息。") : "";
+}
 function trimNumber(value) { return Number(Number(value).toFixed(2)); }
 function formatLatency(value) {
   const latency = Number(value);

@@ -81,11 +81,14 @@ button { font: inherit; }
 .hover-tooltip { position: fixed; z-index: 1000; top: 0; left: 0; pointer-events: none; opacity: 0; transform: translate(-1000px, -1000px); }
 .hover-tooltip.visible { opacity: 1; }
 .info-tooltip { max-width: min(250px, calc(100vw - 20px)); padding: 7px 9px; border-radius: 4px; background: #29292f; color: #fff; font-size: 12px; }
-.chart-tooltip { width: 256px; padding: 4px; overflow: hidden; border: .5px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 3%), 0 1px 4px rgb(0 0 0 / 3%); color: #787882; }
+.chart-tooltip { width: min(320px, calc(100vw - 20px)); padding: 4px; overflow: hidden; border: .5px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 3%), 0 1px 4px rgb(0 0 0 / 3%); color: #787882; }
 .tooltip-date { min-height: 28px; padding: 4px 8px; border-bottom: .5px solid var(--soft-line); font-size: 14px; }
 .tooltip-result { display: flex; align-items: center; min-height: 32px; gap: 8px; padding: 4px 8px; }
 .tooltip-result strong { color: #787882; font-size: 14px; font-weight: 400; }
 .tooltip-latency { margin-left: auto; color: #95959d; font-size: 12px; white-space: nowrap; }
+.tooltip-error { margin: 0 4px 4px; border-top: .5px solid #fee2e2; padding: 8px 4px 4px; overflow-wrap: anywhere; }
+.tooltip-error span { display: block; margin-bottom: 3px; color: #dc2626; font-size: 11px; font-weight: 600; }
+.tooltip-error p { max-height: 112px; margin: 0; overflow: auto; color: #52525b; font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
 .history-button { display: flex; align-items: center; width: max-content; gap: 8px; margin: 24px auto 0; border: .5px solid #cacace; border-radius: 7px; padding: 8px 13px; background: #fff; color: #161618; text-decoration: none; font-size: 14px; transition: background-color .15s, border-color .15s; }
 .history-button:hover { border-color: #95959d; background: #f7f7f8; }
 .calendar-icon { position: relative; width: 15px; height: 14px; border: 2px solid #161618; border-radius: 3px; }
