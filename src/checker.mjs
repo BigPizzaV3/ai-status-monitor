@@ -499,6 +499,13 @@ function isRetryableAbort(checked) {
   return checked.status === "error" && /request was aborted|请求超时/i.test(checked.message);
 }
 
+// Claude Code 伪装检测打的是号池中继，Cloudflare 偶发 502/503/504；
+// 这类瞬时错误重试一次即可，持续不可用的话最终仍会记录为异常。
+function isRetryableClaudeCodeError(config, checked) {
+  if (config.checkMode !== "claude-code" || checked.status !== "error") return false;
+  return /HTTP 5\d\d/i.test(checked.message || "");
+}
+
 function result(config, status, latencyMs, pingLatencyMs, message) {
   return { id: config.id, name: config.name, type: config.type, endpoint: config.endpoint, model: config.model, status, latencyMs, pingLatencyMs, checkedAt: new Date().toISOString(), message, groupName: config.groupName };
 }
@@ -579,7 +586,8 @@ async function checkWithRetry(config, options) {
   const attempts = config.checkMode === "image" ? 1 : 3;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const checked = await checkProvider(config, options);
-    if (!isRetryableAbort(checked) || attempt === attempts - 1) return checked;
+    const retryable = isRetryableAbort(checked) || isRetryableClaudeCodeError(config, checked);
+    if (!retryable || attempt === attempts - 1) return checked;
   }
 }
 

@@ -98,3 +98,31 @@ test("上游返回 403 时展示真实错误", async (t) => {
   assert.match(result.message, /HTTP 403/);
   assert.match(result.message, /relay_official_client_only/);
 });
+
+test("claude-code 模式遇到瞬时 502 会重试", async (t) => {
+  let calls = 0;
+  mockFetch(t, async (url, init) => {
+    if (url.includes("/v1/messages?beta=true") && init.method === "POST") {
+      calls += 1;
+      if (calls === 1) {
+        return new Response(JSON.stringify({ error: { message: "Bad gateway" } }), {
+          status: 502,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('event: message_start\ndata: {"type":"message_start"}\n\n'));
+          controller.close();
+        }
+      });
+      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    }
+    return new Response("", { status: 200 });
+  });
+
+  const { checkAll } = await import("../src/checker.mjs");
+  const results = await checkAll([provider], { concurrency: 1 });
+  assert.equal(calls, 2);
+  assert.equal(results[0].status, "operational");
+});
