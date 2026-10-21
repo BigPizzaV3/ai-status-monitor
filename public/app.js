@@ -16,6 +16,7 @@ let activeTooltipTarget = null;
 let activeHistoryBar = null;
 let activeHistoryPage = 0;
 let loading = false;
+let basePollIntervalMs = 120_000;
 
 const isHistoryPage = window.location.pathname === "/history" || window.location.pathname === "/history/";
 document.body.classList.toggle("history-page", isHistoryPage);
@@ -30,6 +31,11 @@ historyNavigationButtons.forEach((button) => button.addEventListener("click", ()
   load(targetPage);
 }));
 componentRoot.addEventListener("click", (event) => {
+  const imageChart = event.target.closest(".history-bars[data-image-url]");
+  if (imageChart) {
+    openImagePreview(imageChart.dataset.imageUrl, imageChart.dataset.imageTitle);
+    return;
+  }
   const toggle = event.target.closest(".group-toggle");
   if (!toggle) return;
   const row = toggle.closest(".group-row");
@@ -37,6 +43,13 @@ componentRoot.addEventListener("click", (event) => {
   toggle.setAttribute("aria-expanded", String(opening));
   row.classList.toggle("expanded", opening);
   hideTooltip();
+});
+componentRoot.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const imageChart = event.target.closest?.(".history-bars[data-image-url]");
+  if (!imageChart) return;
+  event.preventDefault();
+  openImagePreview(imageChart.dataset.imageUrl, imageChart.dataset.imageTitle);
 });
 componentRoot.addEventListener("pointermove", trackTooltip);
 componentRoot.addEventListener("pointerleave", hideTooltip);
@@ -66,6 +79,7 @@ async function load(historyPage = activeHistoryPage) {
 }
 
 function render(data) {
+  basePollIntervalMs = Number(data.pollIntervalMs) || basePollIntervalMs;
   heroStatus.hidden = data.showOverallAlert === false;
   if (data.overall === "outage") {
     setOverall("outage", "部分系统出现异常", "我们已检测到影响部分模型服务的问题。");
@@ -101,10 +115,18 @@ function setOverall(status, title, message) {
 }
 
 function buildGroups(components) {
+  // Image components are classified first (their names also contain "GPT"),
+  // but their group is rendered last so the text groups stay on top. Grok runs
+  // over the OpenAI-compatible protocol, so the GPT group must not claim it.
+  const isImage = (item) => item.kind === "image" || item.checkMode === "image";
+  const isGrok = (item) => /Grok|xAI/i.test(`${item.name} ${item.model}`);
   const definitions = [
-    { name: "Claude", match: (item) => /Claude|Anthropic/i.test(`${item.name} ${item.providerType}`) },
-    { name: "Grok", match: (item) => /Grok|xAI/i.test(`${item.name} ${item.model}`) },
-    { name: "GPT", match: (item) => /GPT|OpenAI/i.test(`${item.name} ${item.providerType}`) }
+    { name: "GPT", match: (item) => !isImage(item) && !isGrok(item) && /GPT|OpenAI/i.test(`${item.name} ${item.providerType}`) },
+    { name: "Claude", match: (item) => !isImage(item) && /Claude|Anthropic/i.test(`${item.name} ${item.providerType}`) },
+    { name: "Grok", match: (item) => !isImage(item) && isGrok(item) },
+    // Image probes run on their own hourly cadence; keep them out of the
+    // per-minute text groups so one chart never mixes two time scales.
+    { name: "生图", match: isImage }
   ];
   const used = new Set();
   const groups = definitions.map((definition) => {
@@ -159,7 +181,7 @@ function renderGroup(group, expanded) {
       <span class="chevron" aria-hidden="true"></span>
       <span class="uptime">${group.uptime === null ? "" : `${group.uptime}% 可用率`}</span>
     </button>
-    ${renderBars(group.points)}
+    ${renderBars(group.points, group.children.length === 1 ? group.children[0].model : `${group.name} 汇总`)}
     <div class="children-collapse"><div class="children-inner">
       ${group.children.map(renderChild).join("")}
     </div></div>
@@ -168,24 +190,40 @@ function renderGroup(group, expanded) {
 
 function renderChild(component) {
   const status = component.latest?.status || "unknown";
+  const slowerThanBase = Number(component.intervalMs) > basePollIntervalMs * 2;
+  const cadence = slowerThanBase && component.intervalLabel
+    ? `<span class="child-interval">${escapeHtml(component.intervalLabel)}检测</span>`
+    : "";
+  const imageOptions = component.image?.url
+    ? {
+        imageUrl: component.image.url,
+        imageTitle: `${component.name} · ${component.image.capturedAt ? formatDate(component.image.capturedAt) : "最近一张生图"}`
+      }
+    : {};
   return `<div class="child-row">
     <div class="child-heading">
       <span class="status-icon ${statusClass(status)}" aria-hidden="true">${statusGlyph(status)}</span>
-      <h4>${escapeHtml(component.name)}</h4>
+      <div class="child-title"><h4>${escapeHtml(component.name)}</h4><span class="child-model">${escapeHtml(component.model || "模型未知")}</span>${cadence}</div>
       <span class="uptime">${component.uptime === null ? "" : `${trimNumber(component.uptime)}% 可用率`}</span>
     </div>
-    ${renderBars(component.points)}
+    ${renderBars(component.points, component.model, imageOptions)}
   </div>`;
 }
 
-function renderBars(points) {
+function renderBars(points, model = "", options = {}) {
   const count = 91;
   const sampled = points.length > count
     ? Array.from({ length: count }, (_, index) => points[Math.floor(index * points.length / count)])
     : [...Array(Math.max(0, count - points.length)).fill(null), ...points];
-  return `<div class="history-bars" aria-label="最近真实请求记录">${sampled.map((point) => point
-    ? `<span class="history-bar ${barClass(point.status)}" tabindex="0" data-date="${escapeHtml(formatDate(point.at))}" data-status="${escapeHtml(statusLabel(point.status))}" data-kind="${statusClass(point.status)}" data-latency="${escapeHtml(formatLatency(point.latencyMs))}" data-message="${escapeHtml(errorTooltipMessage(point))}"></span>`
-    : `<span class="history-bar empty" tabindex="0" data-date="暂无数据" data-status="无检测记录" data-kind="unknown" data-latency="延迟未知" data-message=""></span>`).join("")}</div>`;
+  const imageAttrs = options.imageUrl
+    ? ` data-image-url="${escapeHtml(options.imageUrl)}" data-image-title="${escapeHtml(options.imageTitle || model || "最近一张生图")}" role="button" tabindex="0" aria-label="点击询问最近一张生图"`
+    : "";
+  const chart = `<div class="history-bars${imageAttrs ? " image-bars" : ""}"${imageAttrs} aria-label="最近真实请求记录">${sampled.map((point) => point
+    ? `<span class="history-bar ${barClass(point.status)}" tabindex="0" data-date="${escapeHtml(formatDate(point.at))}" data-model="${escapeHtml(point.model || model || "模型未知")}" data-status="${escapeHtml(statusLabel(point.status))}" data-kind="${statusClass(point.status)}" data-latency="${escapeHtml(formatLatency(point.latencyMs))}" data-message="${escapeHtml(errorTooltipMessage(point))}"></span>`
+    : `<span class="history-bar empty" tabindex="0" data-date="暂无数据" data-model="${escapeHtml(model || "模型未知")}" data-status="无检测记录" data-kind="unknown" data-latency="延迟未知" data-message=""></span>`).join("")}</div>`;
+  return imageAttrs
+    ? `${chart}<div class="image-bars-hint">点击条上任意一点查看最近一张生图</div>`
+    : chart;
 }
 
 function renderHistory(data) {
@@ -211,9 +249,43 @@ function renderHistory(data) {
 function renderIncident(item) {
   const time = new Date(item.at).toLocaleTimeString("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false });
   return `<article class="incident-card ${statusClass(item.status)}">
-    <div class="incident-copy"><h2>${escapeHtml(item.componentName)} · ${escapeHtml(statusLabel(item.status))}</h2><p>${escapeHtml(item.message || "检测到服务状态异常。")}</p></div>
+    <div class="incident-copy"><h2>${escapeHtml(item.componentName)} · ${escapeHtml(item.model || "模型未知")} · ${escapeHtml(statusLabel(item.status))}</h2><p>${escapeHtml(displayMessage(item.message, item.status))}</p></div>
     <time datetime="${escapeHtml(item.at)}">${escapeHtml(time)}</time>
   </article>`;
+}
+
+function openImagePreview(url, title) {
+  if (!url) return;
+  document.querySelector(".image-preview")?.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "image-preview";
+  overlay.innerHTML = `<div class="image-preview-panel" role="dialog" aria-modal="true" aria-label="${escapeHtml(title || "最近一张生图")}">
+    <div class="image-preview-head"><strong>${escapeHtml(title || "最近一张生图")}</strong><button type="button" class="image-preview-close" aria-label="关闭">×</button></div>
+    <div class="image-preview-body"><p class="image-preview-hint">正在加载最近一张生图…</p><img alt="${escapeHtml(title || "最近一张生图")}" hidden></div>
+  </div>`;
+  document.body.append(overlay);
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKeydown);
+  };
+  const onKeydown = (event) => {
+    if (event.key === "Escape") close();
+  };
+  document.addEventListener("keydown", onKeydown);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest(".image-preview-close")) close();
+  });
+  const hint = overlay.querySelector(".image-preview-hint");
+  const image = overlay.querySelector("img");
+  image.addEventListener("load", () => {
+    hint.textContent = "点击空白处或按 Esc 关闭";
+    hint.classList.add("loaded");
+    image.hidden = false;
+  });
+  image.addEventListener("error", () => {
+    hint.textContent = "最近一次生图图片加载失败，可能尚未生成或已被清理。";
+  });
+  image.src = url;
 }
 
 function trackTooltip(event) {
@@ -258,7 +330,7 @@ function showTooltipFor(target, event, chartRect = null) {
     ? `<div class="tooltip-error"><span>错误信息</span><p>${escapeHtml(target.dataset.message)}</p></div>`
     : "";
   const tooltipContent = isBar
-    ? `<div class="tooltip-date">${escapeHtml(target.dataset.date)}</div><div class="tooltip-result"><span class="status-icon ${escapeHtml(target.dataset.kind)}">${statusGlyph(target.dataset.kind)}</span><strong>${escapeHtml(target.dataset.status)}</strong><span class="tooltip-latency">${escapeHtml(target.dataset.latency)}</span></div>${errorMessage}`
+    ? `<div class="tooltip-date">${escapeHtml(target.dataset.date)}</div><div class="tooltip-model">${escapeHtml(target.dataset.model || "模型未知")}</div><div class="tooltip-result"><span class="status-icon ${escapeHtml(target.dataset.kind)}">${statusGlyph(target.dataset.kind)}</span><strong>${escapeHtml(target.dataset.status)}</strong><span class="tooltip-latency">${escapeHtml(target.dataset.latency)}</span></div>${errorMessage}`
     : escapeHtml(target.dataset.tooltip);
 
   if (targetChanged) {
@@ -329,7 +401,19 @@ function statusClass(status) { if (["failed", "validation_failed", "error", "out
 function statusGlyph(status) { const kind = statusClass(status); return kind === "outage" ? "×" : kind === "degraded" ? "!" : kind === "unknown" ? "?" : "✓"; }
 function barClass(status) { return statusClass(status); }
 function errorTooltipMessage(point) {
-  return statusClass(point.status) === "outage" ? String(point.message || "检测失败，未返回详细错误信息。") : "";
+  return statusClass(point.status) === "outage" ? displayMessage(point.message, point.status) : "";
+}
+function displayMessage(message, status) {
+  const text = String(message || "检测失败，未返回详细错误信息。");
+  if (statusClass(status) === "outage" && isLegacyCompletedResponsesFalsePositive(text)) {
+    return "上游已返回完整 Responses SSE；这是旧版本解析误判，检测器已修复。";
+  }
+  return text;
+}
+function isLegacyCompletedResponsesFalsePositive(message) {
+  return /response\.completed/.test(message)
+    && /["']status["']\s*:\s*["']completed["']/.test(message)
+    && !/response\.(?:failed|incomplete)/.test(message);
 }
 function trimNumber(value) { return Number(Number(value).toFixed(2)); }
 function formatLatency(value) {
@@ -338,7 +422,11 @@ function formatLatency(value) {
   return `${Math.round(latency)}ms`;
 }
 function formatHistoryRange(components) {
-  const dates = components.flatMap((item) => item.points.map((point) => new Date(point.at))).filter((date) => !Number.isNaN(date.valueOf())).sort((a, b) => a - b);
+  // Slow components (hourly image probes) would stretch the range to days; the
+  // header range describes the base-cadence window instead.
+  const fast = components.filter((item) => !Number(item.intervalMs) || Number(item.intervalMs) <= basePollIntervalMs * 2);
+  const source = fast.length ? fast : components;
+  const dates = source.flatMap((item) => item.points.map((point) => new Date(point.at))).filter((date) => !Number.isNaN(date.valueOf())).sort((a, b) => a - b);
   if (!dates.length) return "暂无记录";
   const first = dates[0].toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   const last = dates.at(-1).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });

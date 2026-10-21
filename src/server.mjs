@@ -6,6 +6,7 @@ import { loadConfig } from "./config.mjs";
 import { HistoryStore } from "./store.mjs";
 import { checkAll } from "./checker.mjs";
 import { CheckerService } from "./service.mjs";
+import { ImageStore } from "./image-store.mjs";
 import { transformStatus } from "./status-view.mjs";
 import { booleanEnv } from "./env.mjs";
 import { loadSiteConfig, renderSiteHtml } from "./site.mjs";
@@ -31,6 +32,11 @@ const intervalMs = numberEnv("CHECK_POLL_INTERVAL_SECONDS", 120, 15, 3600) * 100
 const providers = await loadConfig(process.env.CONFIG_FILE || "/app/config/providers.json");
 const store = new HistoryStore(process.env.HISTORY_FILE || "/app/data/history.json", numberEnv("HISTORY_RETENTION_DAYS", 30, 1, 365));
 await store.init();
+// Only the newest generated image per provider is retained, right next to the
+// history file so the existing data volume keeps it across restarts.
+const imageDirectory = process.env.IMAGES_DIR || path.join(path.dirname(process.env.HISTORY_FILE || "/app/data/history.json"), "images");
+const imageStore = new ImageStore({ directory: imageDirectory });
+const existingImages = await imageStore.init();
 const smtpUsername = process.env.SMTP_USERNAME?.trim() || "";
 const emailNotifier = createEmailNotifier({
   host: process.env.SMTP_HOST?.trim(),
@@ -58,6 +64,7 @@ const alertNotifier = createNotifierGroup([
 const service = new CheckerService({
   providers,
   store,
+  imageStore,
   checkAll,
   intervalMs,
   concurrency: numberEnv("CHECK_CONCURRENCY", 5, 1, 20),
@@ -130,12 +137,30 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/favicon.svg") return serveFile(response, "favicon.svg", "image/svg+xml");
   if (request.method === "GET" && url.pathname === "/app.css") return serveFile(response, "app.css", "text/css; charset=utf-8");
   if (request.method === "GET" && url.pathname === "/app.js") return serveFile(response, "app.js", "text/javascript; charset=utf-8");
+  if (request.method === "GET" && url.pathname.startsWith("/api/images/")) {
+    let id = "";
+    try {
+      id = decodeURIComponent(url.pathname.slice("/api/images/".length));
+    } catch {}
+    const image = await imageStore.read(id).catch(() => null);
+    if (!image) {
+      response.writeHead(404, { "content-type": "application/json" });
+      return response.end(JSON.stringify({ error: "Not found" }));
+    }
+    response.writeHead(200, {
+      "content-type": image.mimeType,
+      "content-length": image.bytes.length,
+      "cache-control": "private, max-age=300",
+      "x-image-captured-at": image.capturedAt
+    });
+    return response.end(image.bytes);
+  }
   response.writeHead(404, { "content-type": "application/json" });
   response.end(JSON.stringify({ error: "Not found" }));
 });
 
 server.listen(port, "0.0.0.0", () => {
-  console.log(`[ai-status-monitor] listening on :${port}; providers=${providers.length}; interval=${intervalMs}ms`);
+  console.log(`[ai-status-monitor] listening on :${port}; providers=${providers.length}; interval=${intervalMs}ms; storedImages=${existingImages.length}`);
   service.start();
   telegramCommands?.start();
 });

@@ -6,12 +6,25 @@ export function transformStatus(source) {
   const components = providers.map((provider) => {
     const timeline = Array.isArray(provider.timeline) ? [...provider.timeline].reverse() : [];
     const latest = provider.latest || null;
+    const kind = provider.kind === "image" ? "image" : "text";
     return {
       id: provider.id,
       name: provider.name,
-      description: `${provider.model} · ${providerLabel(provider.type)}`,
+      description: kind === "image"
+        ? `${provider.model} · ${providerLabel(provider.type)} · 生图检测`
+        : `${provider.model} · ${providerLabel(provider.type)}`,
       model: provider.model,
       providerType: provider.type,
+      kind,
+      intervalMs: provider.intervalMs ?? null,
+      intervalLabel: provider.intervalLabel ?? null,
+      nextCheckAt: provider.nextCheckAt ?? null,
+      image: provider.image ? {
+        url: `/api/images/${encodeURIComponent(provider.id)}?v=${encodeURIComponent(String(provider.image.capturedAt || ""))}`,
+        capturedAt: provider.image.capturedAt || null,
+        mimeType: provider.image.mimeType || null,
+        bytes: provider.image.bytes ?? null
+      } : null,
       latest: latest ? {
         status: latest.status,
         ok: HEALTHY_STATUSES.has(latest.status),
@@ -24,6 +37,7 @@ export function transformStatus(source) {
       checks: provider.statistics?.totalChecks ?? timeline.length,
       points: timeline.map((point) => ({
         at: point.checkedAt,
+        model: provider.model,
         status: point.status,
         ok: HEALTHY_STATUSES.has(point.status),
         latencyMs: point.latencyMs,
@@ -57,6 +71,7 @@ export function transformStatus(source) {
       .map((item) => ({
         componentId: item.id,
         componentName: item.name,
+        model: item.model,
         at: item.latest.checkedAt,
         status: item.latest.status,
         message: item.latest.message,

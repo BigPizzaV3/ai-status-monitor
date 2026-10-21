@@ -54,6 +54,46 @@ test("simple mode sends hi through an OpenAI-compatible streaming request", asyn
   assert.match(result.message, /^回复成功/);
 });
 
+test("simple mode accepts a completed Responses SSE relay stream", async (t) => {
+  const server = http.createServer((request, response) => {
+    if (request.method === "HEAD") {
+      response.writeHead(200).end();
+      return;
+    }
+    request.resume();
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.end([
+      "event: response.created",
+      'data: {"response":{"id":"resp_local_test","model":"test-model","status":"in_progress"}}',
+      "",
+      "event: response.output_text.delta",
+      'data: {"delta":"Hi! What can I help you with?","response_id":"resp_local_test"}',
+      "",
+      "event: response.completed",
+      'data: {"response":{"id":"resp_local_test","model":"test-model","output_text":"Hi! What can I help you with?","status":"completed","usage":{"input_tokens":1,"output_tokens":7,"total_tokens":8}}}',
+      ""
+    ].join("\n"));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+
+  const { port } = server.address();
+  const result = await checkProvider({
+    id: "responses-sse",
+    name: "Responses SSE",
+    type: "openai",
+    endpoint: `http://127.0.0.1:${port}/v1/responses`,
+    model: "test-model",
+    apiKey: "test-key",
+    checkMode: "simple",
+    simplePrompt: "hi"
+  });
+
+  assert.equal(result.status, "operational");
+  assert.match(result.message, /^回复成功/);
+});
+
 test("provider HTTP errors include status and response message", async (t) => {
   const server = http.createServer((request, response) => {
     if (request.method === "HEAD") {

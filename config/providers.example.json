@@ -28,5 +28,38 @@
     "requestHeaders": null,
     "metadata": null,
     "groupName": null
+  },
+  {
+    "id": "example-openai-image",
+    "name": "GPT Image Example",
+    "type": "openai",
+    "endpoint": "https://example.com/v1/images/generations",
+    "model": "gpt-image-example",
+    "apiKey": "replace-me",
+    "checkMode": "image",
+    "imagePrompt": "一只拉布拉多犬一直用前爪举着一块牌子，牌子上写着 \"JOJO Code\"",
+    "imageSize": "1024x1024",
+    "intervalSeconds": 3600,
+    "timeoutMs": 240000,
+    "degradedMs": 120000,
+    "enabled": false,
+    "isMaintenance": false,
+    "requestHeaders": null,
+    "metadata": null,
+    "groupName": null
+  },
+  {
+    "id": "example-anthropic-claude-code",
+    "name": "Claude Code 伪装示例",
+    "type": "anthropic",
+    "endpoint": "https://example.com/v1/messages",
+    "model": "claude-example",
+    "apiKey": "replace-me",
+    "checkMode": "claude-code",
+    "enabled": false,
+    "isMaintenance": false,
+    "requestHeaders": null,
+    "metadata": null,
+    "groupName": null
   }
 ]

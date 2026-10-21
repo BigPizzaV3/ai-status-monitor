@@ -32,6 +32,34 @@ test("status view converts checker data for the bundled frontend", () => {
   assert.equal(output.checkedAt, "2026-08-13T00:00:00.000Z");
   assert.equal(output.components[0].description, "gpt · OpenAI 协议");
   assert.equal(output.components[0].points[0].at, "2026-08-12T23:58:00.000Z");
+  assert.equal(output.components[0].points[0].model, "gpt");
   assert.equal(output.incidents[0].componentName, "One");
+  assert.equal(output.incidents[0].model, "gpt");
   assert.deepEqual(output.history, { page: 1, pageSize: 91, hasOlder: true, hasNewer: true });
+});
+
+test("status view marks image probes and keeps their own cadence", () => {
+  const output = transformStatus({
+    providers: [{
+      id: "image",
+      name: "GPT 生图",
+      type: "openai",
+      model: "gpt-image-2",
+      kind: "image",
+      intervalMs: 3_600_000,
+      intervalLabel: "1 小时",
+      image: { mimeType: "image/png", bytes: 1024, capturedAt: "2026-08-13T00:00:00.000Z" },
+      latest: { status: "operational", latencyMs: 30_000, pingLatencyMs: 10, checkedAt: "2026-08-13T00:00:00.000Z", message: "生图成功" },
+      statistics: { successRate: 100, totalChecks: 1 },
+      timeline: [{ status: "operational", latencyMs: 30_000, pingLatencyMs: 10, checkedAt: "2026-08-13T00:00:00.000Z", message: "生图成功" }]
+    }],
+    summary: { total: 1, operational: 1 },
+    metadata: { pollIntervalMs: 60_000, pollIntervalLabel: "1 分钟" }
+  });
+  assert.equal(output.components[0].kind, "image");
+  assert.equal(output.components[0].intervalLabel, "1 小时");
+  assert.equal(output.components[0].description, "gpt-image-2 · OpenAI 协议 · 生图检测");
+  assert.equal(output.components[0].points[0].model, "gpt-image-2");
+  assert.equal(output.components[0].image.url, "/api/images/image?v=2026-08-13T00%3A00%3A00.000Z");
+  assert.equal(output.components[0].image.capturedAt, "2026-08-13T00:00:00.000Z");
 });

@@ -155,3 +155,79 @@ test("service summarizes a requested history window", () => {
   assert.equal(summary.providers[0].maxLatencyMs, 11_000);
   assert.deepEqual(summary.providers[0].trend, ["degraded", "error"]);
 });
+
+test("service only checks providers whose own interval elapsed", async () => {
+  let nowMs = Date.parse("2026-08-16T04:00:00.000Z");
+  const checked = [];
+  const points = [];
+  const service = new CheckerService({
+    providers: [
+      { id: "text", name: "Text", type: "openai", endpoint: "https://example.com/v1/responses", model: "gpt", groupName: null },
+      { id: "image", name: "Image", type: "openai", endpoint: "https://example.com/v1/images/generations", model: "gpt-image-2", groupName: null, kind: "image", intervalMs: 3_600_000 }
+    ],
+    store: { points: () => points, append: async (items) => points.push(...items) },
+    checkAll: async (providers) => {
+      checked.push(providers.map((provider) => provider.id).join(","));
+      return providers.map((provider) => ({ ...result("operational", 500), id: provider.id, name: provider.name }));
+    },
+    intervalMs: 60_000,
+    concurrency: 1,
+    timeoutMs: 45_000,
+    degradedMs: 10_000,
+    now: () => new Date(nowMs)
+  });
+
+  await service.runDue();
+  assert.deepEqual(checked, ["text,image"]);
+  const initial = service.status();
+  assert.equal(initial.providers[1].kind, "image");
+  assert.equal(initial.providers[1].intervalLabel, "1 小时");
+  assert.equal(initial.providers[0].intervalLabel, "1 分钟");
+  assert.ok(initial.providers[1].nextCheckAt);
+
+  nowMs += 60_000;
+  await service.runDue();
+  assert.deepEqual(checked, ["text,image", "text"]);
+
+  nowMs += 3_540_000;
+  await service.runDue();
+  assert.deepEqual(checked, ["text,image", "text", "text,image"]);
+
+  nowMs += 1_000;
+  assert.deepEqual(await service.runDue(), []);
+
+  // Manual trigger still refreshes every provider regardless of cadence.
+  await service.run();
+  assert.equal(checked.at(-1), "text,image");
+});
+
+test("service stores the latest image and keeps history free of binaries", async () => {
+  const points = [];
+  const saves = [];
+  const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+  const imageMeta = { mimeType: "image/png", bytes: PNG.length, capturedAt: "2026-10-17T12:00:00.000Z" };
+  const service = new CheckerService({
+    providers: [{ id: "img", name: "Img", type: "openai", endpoint: "https://x/v1/images/generations", model: "gpt-image-2", groupName: null, kind: "image", intervalMs: 3_600_000 }],
+    store: { points: () => points, append: async (items) => points.push(...items) },
+    checkAll: async () => [{
+      ...result("operational", 1000),
+      id: "img",
+      name: "Img",
+      image: { bytes: PNG }
+    }],
+    imageStore: {
+      meta: (id) => (id === "img" ? imageMeta : null),
+      save: async (id, image) => { saves.push([id, image.bytes.length]); return imageMeta; }
+    },
+    intervalMs: 60_000,
+    concurrency: 1,
+    timeoutMs: 45_000,
+    degradedMs: 10_000
+  });
+
+  await service.runDue();
+  assert.deepEqual(saves, [["img", PNG.length]]);
+  assert.equal(points.length, 1);
+  assert.equal("image" in points[0], false);
+  assert.deepEqual(service.status().providers[0].image, imageMeta);
+});

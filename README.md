@@ -106,6 +106,46 @@ Telegram Bot -> /status、/history -> 读取已有状态和历史
 
 发送 `simplePrompt`，只要模型返回非空内容即可通过检测。`simplePrompt` 未填写时默认发送 `hi`。
 
+### Claude Code 伪装检测（官方客户端校验）
+
+```json
+"checkMode": "claude-code"
+```
+
+针对只放行「官方 Claude Code 客户端」的 Claude Max 号池中继（上游报错
+`relay_official_client_only: only official Claude Code clients are allowed`）：
+检测请求会带上完整官方 CLI 请求头（`claude-cli/...` UA、`x-app: cli`、
+`x-stainless-*`、`anthropic-beta`、`anthropic-dangerous-direct-browser-access`），
+body 使用官方形状（`system` 提示词、`cache_control`、`metadata.user_id` 新版 JSON
+格式、`max_tokens: 1024`、`temperature: 1`、`stream: true`）；收到 SSE
+`message_start` 即判定通过并立刻断开，避免继续消耗上游 token。
+
+只支持 `type: "anthropic"`；请求固定发往 `${endpoint 去掉 /v1/messages 后的根地址}/v1/messages?beta=true`。
+
+### 生图检测
+
+```json
+{
+  "checkMode": "image",
+  "imagePrompt": "一只拉布拉多犬一直用前爪举着一块牌子，牌子上写着 \"JOJO Code\"",
+  "imageSize": "1024x1024",
+  "intervalSeconds": 3600,
+  "timeoutMs": 240000,
+  "degradedMs": 120000
+}
+```
+
+向 `<endpoint 去掉 /responses 等后缀>/images/generations` 发送一次真实生图请求（`model` 即生图模型，例如 `gpt-image-2`），响应中必须包含 `b64_json` 或图片 `url` 才算成功。生图较慢，默认超时 240 秒、耗时超过 120 秒才标记为性能下降；超时不会重试，避免重复计费。
+
+`intervalSeconds` 可为单个渠道单独指定检测间隔（15 秒到 24 小时）；不填时使用全局的 `CHECK_POLL_INTERVAL_SECONDS`。生图渠道通常配置为 `3600`（每小时一次），其曲线和“每小时检测”标签会独立成组展示，不与其他按分钟检测的渠道混排。
+
+多个生图渠道串行检测，避免同时请求导致上游「无可用账号」；遇到 429/5xx 会间隔 3 秒、8 秒各重试一次，仍失败才记录异常。
+
+4K 模型（`gpt-image-2-4k`）需要在渠道配置里显式设置 `imageSize` 为 4K 预设，例如 `3840x2160`（16:9）或 `2880x2880`（1:1）；不设置时上游默认只返回 1024x1024。单张 4K 图片约 6-7MB，图片保存在数据卷的 `data/images/` 下。
+
+每次检测成功后会下载并保存**最近一张生图**（每个渠道只保留最新一张，覆盖写入 `data/images/<渠道 id>.png`，历史记录里不保存图片二进制）。状态页上点击该渠道历史条的任意一点即可弹出查看最近一张图；图片接口为 `GET /api/images/<渠道 id>`。
+
+
 ## 环境变量
 
 ### 检测参数
